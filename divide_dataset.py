@@ -1,6 +1,11 @@
 #This code was taken from https://github.com/spmallick/learnopencv
 #It creates Two .txt used to train the neural network
 #This files uses the images from the dataset to divide the dataset in training and validation sets
+#Francisco Silva
+#Matthew Roberts
+#Team_307
+#4/26/2019
+
 import random
 import os
 import subprocess
