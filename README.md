@@ -10,5 +10,4 @@ To run the Neural Network and the Communication system of the drone from scratch
 
 We would like to thank PINTO0309, AlexeyAB and pjreddie for the resources that helped us finish this project
 
-Francisco Silva
-Matthew Roberts
+Team 307
