@@ -56,7 +56,6 @@ reply_packet = bytearray([90,230,17])
 # File stream variables
 target_path = os.getcwd() + "/targets/"
 target_list = sorted(os.listdir(target_path))
-os.path.abspath(target_path + target_list[0])
 # Start of Program
 print('Program Start')
 
@@ -83,6 +82,7 @@ def build_pixels(image_path)
     img_build = Image.open(image_path, mode='r')
     width, height = img_build.size
     pixels = []
+    num_packages = 0
     rgb_img_build = img_build.convert('RGB')
     for x_coord in range (0,width)
         for y_coord in range (0,height)
@@ -90,7 +90,9 @@ def build_pixels(image_path)
             pixels.append(red)
             pixels.append(green)
             pixels.append(blue)
-    return pixels
+    total_bytes = (width * height * 3)
+    num_packages = math.floor((total_bytes/245))+1
+    return pixels, num_packages
 
 def build_message(pixels, start_index, end_index, part_of_message = 'middle')
 
@@ -107,10 +109,26 @@ def build_message(pixels, start_index, end_index, part_of_message = 'middle')
         msg.append(pixels[counter_build])
         counter_build += 1
 
+    # Insert CRC byte at the end
     msg.append((append_CRC).to_bytes(1, byteorder='big'))
+
     return msg
 
+def reply_handler(packet)
+    correct_reply = False
+    if packet is None:
+        print('- Waiting for Packages -')
+    else:
+        # Receiving packages
+        print("Something has been picked up...")
+        if (packet == reply_packet):
+            print("Starting Image Transfer!")
+            correct_reply = True
+        else:
+            print('Reply invalid. Waiting...')
+    return correct_reply
 # main
+
 
 while True:
 
@@ -121,40 +139,26 @@ while True:
     print(target_list)
     if (len(target_list) != 0):
         # Configuring the image using PIL
-        img = Image.open(os.path.abspath(target_path + target_list[0]), mode='r')
-        img_byte_array = io.BytesIO()
-        img.save(img_byte_array, 'png')
-        img_str = img_byte_array.getvalue()
-        num_packages = math.floor((len(img_str)/251))+1
+        img_path = os.path.abspath(target_path + target_list[0])
+        img_pixels, num_packages = build_pixels(img_path)
+
         # Print Image Info
-        print(len(img_str))
         print('Image grabbed. Preparing to send...')
-        print('Image size: ' + str(len(img_str)))
         print('The number of packages is: ' + str(num_packages))
-        print('Image Stream started')
+
         # Start the send process (251 bytes per package)
         stage = 1
         while True:
             while (stage == 1):
                 # Send start package here
-                rfm9x.send(start_of_stream)
-                packet = rfm9x.receive(1.0)
-                if packet is None:
-                    print('- Waiting for Packages -')
-                else:
-                    # Receiving packages
-                    print("Something has been picked up...")
-                    if (packet == reply_packet):
-                        print("Starting Image Transfer!")
-                        stage = 2
-                    else:
-                        print('Reply invalid. Waiting...')
-                        time.sleep(1)
+                msg = build_message(pixels, start_index, end_index, 'start')
+                rfm9x.send(msg)
+                packet = rfm9x.receive(5.0)
+                (stage = 2) if reply_handler(packet) else (stage = 1)
+                time.sleep(1)
             while (stage == 2):
                 while counter < (num_packages):
-                    msg = img_str[start_index:end_index]
-                    #print(msg)
-                    rfm9x.send(msg)
+
                     print("Package sent: " + str(counter) + '/' + str(num_packages))
                     packet = rfm9x.receive(1.0)
                     if packet is None:
