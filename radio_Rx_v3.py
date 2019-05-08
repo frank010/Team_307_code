@@ -5,7 +5,31 @@ Francisco Silva
 Matthew Roberts
 4/26/2019
 RadioRx
-This file manages the Tx for the communication system
+
+This program will receiver an image from the transmitter, by receiving
+pixels in 247 byte packages, and then drawing them to rebuild the image.
+Includes a CRC (Cyclic Redundency Check), and only looks for PNG images.
+
+CRC Information:
+Max message length is: 247
+Best CRC polynomial from CRC Zoo for a 247 byte long message is 0xe7
+For Polynomial 0xe7, remainer is 0x1cf
+append before sending: 1110 0111 (0xe7)
+modulo when received: 1 1100 1111 (0x1cf)
+246 bytes left
+1 byte for header information
+245 bytes for pixels
+3 bytes per pixels
+81.66 pixels per message
+~ 950 packages per 320x240 image
+
+Notes:
+To send a 320x240 image in about a minute, you need at least 50 kbps.
+Should try to get between 50 to 100 kbps
+Theoretical range at current speed (3 kbps) is ~ 10 kilometers
+Realistically, this became between 2-4 kilometers
+Raising data rate will lower drone range. May need to buy new antenna or watch
+for other sources of noises on drone or interference
 
 """
 #import libraries
@@ -38,10 +62,12 @@ except RuntimeError:
 # Configure LoRa parameters
 rfm9x.tx_power = 23
 
-# Start and end of stream for packages
-start_of_stream = b'\x01\x02\x03\x04\x05'
-end_of_stream = b'\x05\x04\x03\x02\x01'
-packet_sent = bytearray([90,230,17])
+# CRC variables
+CRC_modulo = 463
+
+# Correct and incorrect reply packet
+reply_packet = bytearray([90,230,17])
+wrong_packet = bytearray([])
 
 # Coverting image to array file
 img_array = bytearray()
