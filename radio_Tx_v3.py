@@ -91,17 +91,17 @@ def build_pixels(image_path):
             pixels.append(green)
             pixels.append(blue)
     total_bytes = (width * height * 3)
-    num_packages = math.floor((total_bytes/245))+1
-    return (pixels, num_packages)
+    num_packages = math.ceil((total_bytes/245))
+    return (pixels, width, num_packages)
 
 # Used to send a large array of pixels through smaller packages
-def build_message(pixels, start_index, end_index, part_of_message = 'middle'):
+def build_message(pixels, start_index, end_index, pixel_location = 'middle'):
     msg = []
     counter_build = start_index
-    # Header information to indicate start, middle, or end of stream
-    if (part_of_message == 'start'):
+    # Header information to location of pixel on image
+    if (pixel_location == 'start'):
         part_int = 0
-    elif (part_of_message == 'end'):
+    elif (pixel_location == 'end'):
         part_int = 255
     else:
         part_int = 170
@@ -147,8 +147,7 @@ def main():
         if (len(target_list) != 0):
             # Finds an image and grabs an array of its pixels
             img_path = os.path.abspath(target_path + target_list[0])
-            img_pixels, num_packages = build_pixels(img_path)
-
+            img_pixels, img_width, num_packages = build_pixels(img_path)
             # Print Image Info
             print('Image grabbed. Preparing to send file...')
             print('The number of packages is: ' + str(num_packages))
@@ -201,13 +200,26 @@ def main():
                         counter = 1
                         start_index = 0
                         end_index = 251
+                        stage = 4
+                        break
+                    else:
+                        stage = 3
+                    time.sleep(1)
+                while (stage == 4):
+                    # Sends image width
+                    img_bytes = bytes([img_width])
+                    img_bytes.append((append_CRC).to_bytes(1, byteorder='big'))
+                    rfm9x.send(img_bytes)
+                    print("Width sent: " + image_width)
+                    packet = rfm9x.receive(5.0)
+                    if reply_handler(packet):
                         print('Image sent')
                         print('Moving to next Image...')
                         time.sleep(3)
                         stage = 1
                         break
                     else:
-                        stage = 3
+                        stage = 4
                     time.sleep(1)
         else:
             print('Waiting for more images...')
