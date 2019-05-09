@@ -65,6 +65,14 @@ rfm9x.tx_power = 23
 # CRC variables
 CRC_modulo = 463
 
+# Image sizing and drawing
+img_width = 1
+img_height = 1
+img_x = 0
+img_y = 0
+img = Image.new('RGB', (img_width, img_height))
+drawer = ImageDraw.Draw(img)
+
 # Correct and incorrect reply packet
 reply_packet = bytearray([90,230,17])
 wrong_packet = bytearray([])
@@ -76,57 +84,86 @@ byteImgIO = io.BytesIO()
 # Counters
 image_counter = 1
 
-# FSM for receiving packages
-print("Program Start")
-stage = 1
-while True:
-    print("Ready to receive image...")
-    packet_counter = 1
-    while (stage == 1):
-        packet = None
-        packet = rfm9x.receive(5.0)
-        if packet is None:
-            print('- Waiting for Packages -')
+# Functions
+
+# Checks received packet for errors using CRC
+def packet_handler(packet):
+    correct_packet = False
+    if packet is None:
+        print("- Waiting for Packages -")
+    else:
+        # Receiving packages
+        print("Something has been picked up...")
+        if ((packet % CRC_modulo) == 0):
+            print("Packet is valid. Continuing file transfer...")
+            correct_packet = True
         else:
-            # Receiving packages
-            print("Something has been picked up...")
-            if (packet == start_of_stream):
-                rfm9x.send(packet_sent)
-                print("Starting Image Transfer!")
-                stage = 2
-    while (stage == 2):
-        # Check for package
-        packet = None
-        packet = rfm9x.receive(5.0)
-        if packet is not None:
-        # Receiving package and save it to array variable
-            print("Packet received. RSSI is: " + str(rfm9x.rssi) + ' dbm')
-            print("Packet number: " + str(packet_counter))
-            packet_counter += 1
-            rfm9x.send(packet_sent)
-            img_array = packet
-            stage = 3
-    while (stage == 3):
-        packet = None
-        packet = rfm9x.receive(5.0)
-        if packet is not None:
-        #all packages received
-            if (packet == end_of_stream):
-            # Save image into png file and wait for next package
-                rfm9x.send(packet_sent)
-                print("All packages received!")
-                img_bytes = bytes(img_array)
-                byteImgIO = io.BytesIO(img_bytes)
-                byteImgIO.seek(0)
-                ImageFile.LOAD_TRUNCATED_IMAGES = True
-                img = Image.open(byteImgIO)
-                img.save('/home/pi/Desktop/images_received/Target_' + str(image_counter) + '.png')
-                print('Image Saved!')
-                image_counter += 1
-                stage = 1
-            else:
+            print("Error or different signal received. Waiting..."")
+    return correct_packet
+
+# Breaks down received packet and adds message pixels to received pixels
+def interpret_message(msg, received_pixels):
+    is_end = False
+    inter_counter = 1
+    if (msg[0] == ):
+        print("Starting Packet.")
+        # Cannot extend from an empty list, so have to initialize instead
+        received_pixels = msg[1]
+        inter_counter = 2
+    elif (msg[0] == ):
+        print("Final Packet")
+        is_end = True
+    else:
+        received_pixels = received_pixels
+    received_pixels.extend(msg[inter_counter:-1])
+    return (is_end, received_pixels)
+
+# Draws image from pixel list and then saves it
+# Inspired by javl's slowimage_sender.py
+# Need to continue this function
+def image_drawer(,image_counter):
+
+    img_bytes = bytes(img_array)
+    byteImgIO = io.BytesIO(img_bytes)
+    byteImgIO.seek(0)
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
+    img = Image.open(byteImgIO)
+    # Use os.path absolute here instead
+    img.save('/home/pi/Desktop/images_received/Target_' + str(image_counter) + '.png')
+    print('Image Saved!')
+    image_counter += 1
+    stage = 1
+
+# Main Function
+def main():
+    print("Program Start")
+    while True:
+        print("Ready to receive image...")
+        # Initialize variables
+        rx_pixels = []
+        packet_counter = 1
+        receiving_image = True
+        # FSM for receiving packages
+        while receiving_image:
+            packet = None
+            packet = rfm9x.receive(5.0)
+            if packet_handler:
                 print("Packet received. RSSI is: " + str(rfm9x.rssi) + ' dbm')
                 print("Packet number: " + str(packet_counter))
-                img_array.extend(packet)
-                packet_counter += 1
-                rfm9x.send(packet_sent)
+                is_end, rx_pixels = interpret_message(packet, rx_pixels)
+                rfm9x.send(reply_packet)
+                if is_end:
+                    print("All packages received!")
+                    packet = None
+                    packet = rfm9x.receive(5.0)
+                    # Need to add image width receiving
+                    break
+                else:
+                    packet_counter += 1
+            else:
+                print("- Waiting for Message -")
+
+
+# Main function only starts when program is run directly
+if __name__ == '__main__':
+    main()
