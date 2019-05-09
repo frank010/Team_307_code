@@ -78,7 +78,7 @@ wrong_packet = bytearray([])
 # Functions
 
 # Image to pixels and message (built upon javl's slowimage_sender.py functions)
-def build_pixels(image_path)
+def build_pixels(image_path):
     img_build = Image.open(image_path, mode='r')
     width, height = img_build.size
     pixels = []
@@ -92,10 +92,10 @@ def build_pixels(image_path)
             pixels.append(blue)
     total_bytes = (width * height * 3)
     num_packages = math.floor((total_bytes/245))+1
-    return pixels, num_packages
+    return (pixels, num_packages)
 
 # Used to send a large array of pixels through smaller packages
-def build_message(pixels, start_index, end_index, part_of_message = 'middle')
+def build_message(pixels, start_index, end_index, part_of_message = 'middle'):
     msg = []
     counter_build = start_index
     # Header information to indicate start, middle, or end of stream
@@ -114,7 +114,7 @@ def build_message(pixels, start_index, end_index, part_of_message = 'middle')
     return msg
 
 # Handles correct and incorrect replies from the receiver
-def reply_handler(packet)
+def reply_handler(packet):
     correct_reply = False
     if packet is None:
         print('- Waiting for Packages -')
