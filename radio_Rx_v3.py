@@ -65,21 +65,13 @@ rfm9x.tx_power = 23
 # CRC variables
 CRC_modulo = 463
 
-# Image sizing and drawing
-img_width = 1
-img_height = 1
-img_x = 0
-img_y = 0
-img = Image.new('RGB', (img_width, img_height))
-drawer = ImageDraw.Draw(img)
+# Image variables
+new_img_width = 0
+new_img_height = 0
 
 # Correct and incorrect reply packet
 reply_packet = bytearray([90,230,17])
-wrong_packet = bytearray([])
-
-# Coverting image to array file
-img_array = bytearray()
-byteImgIO = io.BytesIO()
+wrong_packet = bytearray([49,100,442])
 
 # Counters
 image_counter = 1
@@ -88,7 +80,7 @@ image_counter = 1
 
 # Checks received packet for errors using CRC
 def packet_handler(packet):
-    correct_packet = False
+    correct_packet = 0
     if packet is None:
         print("- Waiting for Packages -")
     else:
@@ -96,43 +88,54 @@ def packet_handler(packet):
         print("Something has been picked up...")
         if ((packet % CRC_modulo) == 0):
             print("Packet is valid. Continuing file transfer...")
-            correct_packet = True
+            correct_packet = 1
         else:
             print("Error or different signal received. Waiting..."")
+            correct_packet = 2
     return correct_packet
 
 # Breaks down received packet and adds message pixels to received pixels
 def interpret_message(msg, received_pixels):
     is_end = False
-    inter_counter = 1
-    if (msg[0] == ):
+    counter = 1
+    # Checking where the pixels should be on the list
+    if (int.from_bytes(msg[0], byteorder='big') == 0):
         print("Starting Packet.")
         # Cannot extend from an empty list, so have to initialize instead
-        received_pixels = msg[1]
-        inter_counter = 2
-    elif (msg[0] == ):
-        print("Final Packet")
+        received_pixels = int.from_bytes(msg[1], byteorder='big')
+        counter = 2
+    elif (int.from_bytes(msg[0], byteorder='big') == 255):
+        print("Final Packet.")
         is_end = True
     else:
         received_pixels = received_pixels
-    received_pixels.extend(msg[inter_counter:-1])
+    # Adds all pixels from message to the list
+    received_pixels.extend(int.from_bytes(msg[counter:-1], byteorder='big'))
     return (is_end, received_pixels)
 
 # Draws image from pixel list and then saves it
 # Inspired by javl's slowimage_sender.py
-# Need to continue this function
-def image_drawer(,image_counter):
-
-    img_bytes = bytes(img_array)
-    byteImgIO = io.BytesIO(img_bytes)
-    byteImgIO.seek(0)
-    ImageFile.LOAD_TRUNCATED_IMAGES = True
-    img = Image.open(byteImgIO)
-    # Use os.path absolute here instead
-    img.save('/home/pi/Desktop/images_received/Target_' + str(image_counter) + '.png')
+def image_drawer(pix, new_width, new_height, image_counter):
+    # Image sizing and drawing
+    x = 0
+    y = 0
+    img_cnt = 0
+    img = Image.new('RGB', (new_width, new_height))
+    drawer = ImageDraw.Draw(img)
+    # First pixel and initialization
+    drawer.point((x,y), fill=(pix[img_cnt],pix[img_cnt+1],pix[img_cnt+2]))
+    img_cnt += 3
+    # Draws pixels onto canvas
+    while ((y <= new_height) and ((img_cnt + 3) < len(pix)):
+        if((x + 1) > new_width):
+            x = 0
+            y += 1
+        else:
+            x += 1
+        drawer.point((x,y), fill=(pix[img_cnt],pix[img_cnt+1],pix[img_cnt+2]))
+    # Saves PIL picture as PNG image
+    img.save(os.getcwd()  + '/received_targets/' + str(image_counter) + '.png')
     print('Image Saved!')
-    image_counter += 1
-    stage = 1
 
 # Main Function
 def main():
@@ -147,22 +150,38 @@ def main():
         while receiving_image:
             packet = None
             packet = rfm9x.receive(5.0)
-            if packet_handler:
+            if (packet_handler == 1):
+                # Print signal strength
                 print("Packet received. RSSI is: " + str(rfm9x.rssi) + ' dbm')
                 print("Packet number: " + str(packet_counter))
                 is_end, rx_pixels = interpret_message(packet, rx_pixels)
                 rfm9x.send(reply_packet)
                 if is_end:
                     print("All packages received!")
+                    # Receiving image width
                     packet = None
                     packet = rfm9x.receive(5.0)
-                    # Need to add image width receiving
+                    img_width = int.from_bytes(packet)
+                    rfm9x.send(reply_packet)
+                    print("Image width received: " + img_width)
+                    # Receiving image height
+                    packet = None
+                    packet = rfm9x.receive(5.0)
+                    img_height = int.from_bytes(packet)
+                    rfm9x.send(reply_packet)
+                    print("Image height received: " + img_height)
+                    # Saving image and resetting variables
+                    image_drawer(rx_pixels,img_width,img_height,image_counter)
+                    image_counter += 1
+                    receiving_image = False
                     break
                 else:
                     packet_counter += 1
+            elif (packet_handler == 2):
+                rfm9x.send(wrong_packet)
+                print("- Waiting for Message -")
             else:
                 print("- Waiting for Message -")
-
 
 # Main function only starts when program is run directly
 if __name__ == '__main__':
