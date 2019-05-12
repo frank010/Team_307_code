@@ -73,7 +73,7 @@ end_index = 251
 
 # Correct and incorrect reply packet
 reply_packet = bytearray([90,230,17])
-wrong_packet = bytearray([])
+wrong_packet = bytearray([49,100,442])
 
 # Functions
 
@@ -206,20 +206,35 @@ def main():
                         stage = 3
                     time.sleep(1)
                 while (stage == 4):
-                    # Sends image width
+                    # Sends image width and height
                     img_bytes = bytes([img_width])
                     img_bytes.append((append_CRC).to_bytes(1, byteorder='big'))
                     rfm9x.send(img_bytes)
                     print("Width sent: " + image_width)
                     packet = rfm9x.receive(5.0)
                     if reply_handler(packet):
+                        stage = 5
+                        break
+                    else:
+                        stage = 4
+                    time.sleep(1)
+                while (stage == 5):
+                    # Sends image height
+                    img_bytes = bytes([img_height])
+                    img_bytes.append((append_CRC).to_bytes(1, byteorder='big'))
+                    rfm9x.send(img_bytes)
+                    print("Height sent: " + image_height)
+                    packet = rfm9x.receive(5.0)
+                    if reply_handler(packet):
                         print('Image sent')
+                        os.rename(img_path, (os.getcwd() + "/sent_targets/"))
+                        print('Image moved to /sent_targets/')
                         print('Moving to next Image...')
                         time.sleep(3)
                         stage = 1
                         break
                     else:
-                        stage = 4
+                        stage = 5
                     time.sleep(1)
         else:
             print('Waiting for more images...')
